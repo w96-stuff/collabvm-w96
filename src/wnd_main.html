@@ -1,0 +1,32 @@
+<div class="appbar"></div>
+
+<div class="cvm-toolbar">
+    <button id="home-button" title="Home">⌂</button>
+    <button id="reload-button" title="Reload">↻</button>
+
+    <input
+        id="address"
+        type="text"
+        value="https://computernewb.com/collab-vm/"
+        spellcheck="false"
+    >
+
+    <button id="go-button">Go</button>
+    <button id="external-button">External</button>
+</div>
+
+<div class="cvm-container">
+    <iframe
+        id="collabvm-frame"
+        src="about:blank"
+        title="CollabVM"
+        allow="clipboard-read; clipboard-write; fullscreen"
+        allowfullscreen
+    ></iframe>
+</div>
+
+<div class="cvm-statusbar">
+    <span class="status-light"></span>
+    <span id="status">Ready</span>
+    <span class="cvm-version">CollabVM Client 1.0</span>
+</div>

@@ -1,0 +1,84 @@
+.collabvm-app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    background: #c0c0c0;
+    font-family: Arial, sans-serif;
+}
+
+.collabvm-app .cvm-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px;
+    background: #c0c0c0;
+    border-bottom: 1px solid #808080;
+    flex-shrink: 0;
+}
+
+.collabvm-app .cvm-toolbar button {
+    min-width: 34px;
+    height: 27px;
+    padding: 2px 9px;
+    color: #000;
+    background: #c0c0c0;
+    border: 2px outset #fff;
+    cursor: pointer;
+}
+
+.collabvm-app .cvm-toolbar button:active {
+    border-style: inset;
+}
+
+.collabvm-app #address {
+    flex: 1;
+    min-width: 0;
+    height: 24px;
+    padding: 2px 5px;
+    background: white;
+    color: black;
+    border: 2px inset #aaa;
+    outline: none;
+}
+
+.collabvm-app .cvm-container {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    background: #fff;
+    overflow: hidden;
+}
+
+.collabvm-app #collabvm-frame {
+    width: 100%;
+    height: 100%;
+    flex: 1;
+    border: none;
+    background: white;
+}
+
+.collabvm-app .cvm-statusbar {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 23px;
+    padding: 3px 7px;
+    background: #c0c0c0;
+    border-top: 1px solid white;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.collabvm-app .status-light {
+    width: 8px;
+    height: 8px;
+    background: #00a000;
+    border-radius: 50%;
+}
+
+.collabvm-app .cvm-version {
+    margin-left: auto;
+    color: #555;
+}
