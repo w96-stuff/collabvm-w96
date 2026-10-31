@@ -1,185 +1,390 @@
-/*
- * CollabVM for Windows 96
- * QuickInstall
- *
- * Compatibility target:
- * Windows 96 v3.x - v4.x
- */
+(async function () {
+    const VERSION = "1.2.0";
 
-const VERSION = "1.0.1";
+    const URL_PREFIX =
+        "https://raw.githubusercontent.com/w96-stuff/collabvm-w96/main/src";
 
-const urlPrefix =
-    "https://raw.githubusercontent.com/YOUR_USERNAME/collabvm-w96/main/src";
+    const DEFAULT_PATH = "c:/local/collabvm";
 
-const downloadList = [
-    {
-        filename: "collabvm.js",
-        savepath: "c:/system/boot/apps"
-    },
-    {
-        filename: "collabvm.css",
-        savepath: "c:/local/collabvm"
-    },
-    {
-        filename: "wnd_main.html",
-        savepath: "c:/local/collabvm"
-    }
-];
-
-const shortcutPaths = [
-    "c:/system/programs/Other",
-    "c:/user/desktop"
-];
-
-let done = 0;
-let failed = false;
-
-const FS = w96.FS;
-
-console.group(
-    `%c[ CollabVM QuickInstall ${VERSION} ]`,
-    "color:#8af;font-weight:bold"
-);
-
-// Create directories recursively
-async function ensureDirectory(path) {
-    const parts = path.split("/");
-    let current = parts.shift() + "/";
-
-    for (const part of parts) {
-        if (!part) continue;
-
-        current += part;
-
-        if (!FS.exists(current)) {
-            await FS.mkdir(current);
+    const FILES = [
+        {
+            filename: "collabvm.js",
+            savepath: "c:/system/boot/apps"
+        },
+        {
+            filename: "collabvm.css",
+            local: true
+        },
+        {
+            filename: "wnd_main.html",
+            local: true
         }
+    ];
 
-        current += "/";
-    }
-}
+    const { Theme } = w96.ui;
 
-// Download and install an individual file
-async function installFile(file) {
-    const url = `${urlPrefix}/${file.filename}`;
-    const destination = `${file.savepath}/${file.filename}`;
+    class CollabVMSetup extends WApplication {
+        async main(argv) {
+            super.main(argv);
 
-    console.log(`Fetching ${file.filename}...`);
+            let destination = DEFAULT_PATH;
+            let installing = false;
 
-    const content = await w96.sys.loader.loadTextAsync(
-        url,
-        false
-    );
+            const wnd = this.createWindow({
+                title: "CollabVM Setup",
+                icon: Theme.getIconUrl("network", "small"),
+                initialWidth: 520,
+                initialHeight: 390,
+                center: true,
+                taskbar: true,
+                resizable: false,
+                controlBoxStyle: "WS_CBX_MINCLOSE",
+                body: `
+                    <div class="cvm-setup">
+                        <div class="cvm-header">
+                            <div class="cvm-logo">C</div>
+                            <div>
+                                <b>CollabVM Setup</b>
+                                <div>Version ${VERSION}</div>
+                            </div>
+                        </div>
 
-    if (
-        typeof content !== "string" ||
-        content.length === 0
-    ) {
-        throw new Error(
-            `Could not download ${file.filename}`
-        );
-    }
+                        <div id="welcome" class="cvm-page">
+                            <h3>Welcome to CollabVM Setup</h3>
+                            This wizard will install CollabVM
+                            on your Windows 96 computer.
+                            <p>Click Next to continue.</p>
+                        </div>
 
-    await ensureDirectory(file.savepath);
+                        <div id="destination-page"
+                            class="cvm-page" style="display:none">
+                            <h3>Choose Installation Location</h3>
 
-    console.log(`Saving ${file.filename}...`);
+                            Installation destination:
 
-    await FS.writestr(destination, content);
+                            <input id="destination"
+                                value="${DEFAULT_PATH}"
+                                style="width:100%;box-sizing:border-box">
 
-    if (!FS.exists(destination)) {
-        throw new Error(
-            `Failed to save ${destination}`
-        );
-    }
+                            <p>
+                                <label>
+                                    <input type="checkbox"
+                                        id="desktop" checked>
+                                    Create Desktop shortcut
+                                </label>
+                            </p>
 
-    done++;
+                            <p>
+                                <label>
+                                    <input type="checkbox"
+                                        id="programs" checked>
+                                    Create Programs shortcut
+                                </label>
+                            </p>
+                        </div>
 
-    console.log(
-        `${file.filename} installed (${done}/${downloadList.length})`
-    );
-}
+                        <div id="installing"
+                            class="cvm-page" style="display:none">
+                            <h3>Installing CollabVM...</h3>
 
-// Create desktop and programs shortcuts
-async function installShortcuts() {
-    console.log("Creating shortcuts...");
+                            <progress id="progress"
+                                value="0" max="100"
+                                style="width:100%">
+                            </progress>
 
-    for (const path of shortcutPaths) {
-        await ensureDirectory(path);
+                            <p id="status">Preparing...</p>
+                            <p id="count">0 / 3 files</p>
+                        </div>
 
-        w96.shell.mkShortcut(
-            `${path}/CollabVM.link`,
-            "image2",
-            "collabvm"
-        );
+                        <div id="finished"
+                            class="cvm-page" style="display:none">
+                            <h3>Installation Complete!</h3>
+                            CollabVM has been installed successfully.
+                            <p>You can now launch CollabVM.</p>
+                            <p>Restart Windows 96 if necessary.</p>
+                        </div>
 
-        console.log(`Shortcut created: ${path}`);
-    }
-}
+                        <div class="cvm-footer">
+                            <button id="back">Back</button>
+                            <button id="next">Next</button>
+                            <button id="cancel">Cancel</button>
+                        </div>
+                    </div>
 
-// Main installer
-async function main() {
-    try {
-        console.log("Starting installation...");
+                    <style>
+                        .cvm-setup {
+                            height:100%;
+                            box-sizing:border-box;
+                            padding:15px;
+                            background:#c0c0c0;
+                            color:black;
+                            font-family:Arial,sans-serif;
+                            font-size:12px;
+                            display:flex;
+                            flex-direction:column;
+                        }
 
-        // Install files sequentially
-        for (const file of downloadList) {
-            await installFile(file);
+                        .cvm-header {
+                            display:flex;
+                            align-items:center;
+                            gap:14px;
+                            border-bottom:1px solid #888;
+                            padding-bottom:14px;
+                        }
+
+                        .cvm-header b {
+                            font-size:19px;
+                        }
+
+                        .cvm-logo {
+                            width:55px;
+                            height:55px;
+                            background:#000080;
+                            color:white;
+                            display:flex;
+                            align-items:center;
+                            justify-content:center;
+                            font-size:30px;
+                            font-weight:bold;
+                        }
+
+                        .cvm-page {
+                            flex:1;
+                            padding-top:12px;
+                        }
+
+                        .cvm-footer {
+                            border-top:1px solid #888;
+                            padding-top:10px;
+                            display:flex;
+                            justify-content:flex-end;
+                            gap:5px;
+                        }
+
+                        .cvm-footer button {
+                            min-width:75px;
+                            height:27px;
+                            background:#c0c0c0;
+                            border:2px outset white;
+                        }
+
+                        .cvm-footer button:active {
+                            border-style:inset;
+                        }
+                    </style>
+                `
+            }, true);
+
+            const body = wnd.getBodyContainer();
+
+            const pages = [
+                body.querySelector("#welcome"),
+                body.querySelector("#destination-page"),
+                body.querySelector("#installing"),
+                body.querySelector("#finished")
+            ];
+
+            const back = body.querySelector("#back");
+            const next = body.querySelector("#next");
+            const cancel = body.querySelector("#cancel");
+
+            const progress = body.querySelector("#progress");
+            const status = body.querySelector("#status");
+            const count = body.querySelector("#count");
+
+            let page = 0;
+
+            function showPage(n) {
+                page = n;
+
+                pages.forEach((element, index) => {
+                    element.style.display =
+                        index === n ? "block" : "none";
+                });
+
+                back.style.display =
+                    n === 0 || n >= 2 ? "none" : "inline-block";
+
+                next.textContent =
+                    n === 1 ? "Install" :
+                    n === 3 ? "Finish" : "Next";
+
+                next.disabled = n === 2;
+                cancel.textContent =
+                    n === 3 ? "Close" : "Cancel";
+            }
+
+            async function ensureDirectory(path) {
+                const parts = path.split("/");
+                let current = parts.shift() + "/";
+
+                for (const part of parts) {
+                    if (!part) continue;
+
+                    current += part;
+
+                    if (!w96.FS.exists(current)) {
+                        await w96.FS.mkdir(current);
+                    }
+
+                    current += "/";
+                }
+            }
+
+            async function install() {
+                if (installing) return;
+
+                installing = true;
+
+                destination =
+                    body.querySelector("#destination").value
+                        .trim().replace(/\/+$/, "");
+
+                if (
+                    !/^c:\//i.test(destination) ||
+                    destination.includes("..")
+                ) {
+                    installing = false;
+
+                    w96.ui.DialogCreator.alert(
+                        "Enter a valid C: installation directory.",
+                        {
+                            title: "Invalid Destination",
+                            icon: "error"
+                        }
+                    );
+
+                    return;
+                }
+
+                showPage(2);
+
+                let completed = 0;
+
+                try {
+                    await ensureDirectory(destination);
+
+                    for (const file of FILES) {
+                        status.textContent =
+                            "Downloading " + file.filename;
+
+                        const content =
+                            await w96.sys.loader.loadTextAsync(
+                                URL_PREFIX + "/" + file.filename,
+                                false
+                            );
+
+                        if (
+                            typeof content !== "string" ||
+                            content.length === 0
+                        ) {
+                            throw new Error(
+                                "Download failed: " + file.filename
+                            );
+                        }
+
+                        const folder = file.local
+                            ? destination
+                            : file.savepath;
+
+                        await ensureDirectory(folder);
+
+                        const path =
+                            folder + "/" + file.filename;
+
+                        status.textContent =
+                            "Installing " + file.filename;
+
+                        await w96.FS.writestr(path, content);
+
+                        if (!w96.FS.exists(path)) {
+                            throw new Error(
+                                "Unable to save " + path
+                            );
+                        }
+
+                        completed++;
+
+                        progress.value =
+                            completed / FILES.length * 100;
+
+                        count.textContent =
+                            completed + " / " +
+                            FILES.length + " files";
+                    }
+
+                    if (body.querySelector("#desktop").checked) {
+                        await ensureDirectory(
+                            "c:/user/desktop"
+                        );
+
+                        w96.shell.mkShortcut(
+                            "c:/user/desktop/CollabVM.link",
+                            "image2",
+                            "collabvm"
+                        );
+                    }
+
+                    if (body.querySelector("#programs").checked) {
+                        await ensureDirectory(
+                            "c:/system/programs/Other"
+                        );
+
+                        w96.shell.mkShortcut(
+                            "c:/system/programs/Other/CollabVM.link",
+                            "image2",
+                            "collabvm"
+                        );
+                    }
+
+                    status.textContent =
+                        "Installation completed!";
+
+                    showPage(3);
+
+                } catch (error) {
+                    console.error(error);
+
+                    installing = false;
+                    next.disabled = false;
+
+                    w96.ui.DialogCreator.alert(
+                        "Installation failed:<br><br>" +
+                        String(error.message || error),
+                        {
+                            title: "Setup Error",
+                            icon: "error"
+                        }
+                    );
+                }
+            }
+
+            back.addEventListener("click", () => {
+                if (page === 1) showPage(0);
+            });
+
+            next.addEventListener("click", async () => {
+                if (page === 0) {
+                    showPage(1);
+                } else if (page === 1) {
+                    await install();
+                } else if (page === 3) {
+                    this.terminate();
+                }
+            });
+
+            cancel.addEventListener("click", () => {
+                if (!installing) {
+                    this.terminate();
+                }
+            });
+
+            showPage(0);
+            wnd.show();
         }
-
-        // Install shortcuts after successful downloads
-        await installShortcuts();
-
-        console.log("Installation completed!");
-        console.log(
-            "Installed " + done + " of " +
-            downloadList.length + " files."
-        );
-
-        console.groupEnd();
-
-        w96.ui.DialogCreator.alert(
-            `
-            <b>CollabVM installed successfully!</b>
-            <br><br>
-            Version: ${VERSION}
-            <br>
-            Files installed: ${done}/${downloadList.length}
-            <br><br>
-            Desktop shortcuts have been created.
-            <br><br>
-            Restart Windows 96 to finish loading
-            the new application.
-            `,
-            {
-                title: "CollabVM Setup",
-                icon: "info"
-            }
-        );
-
-    } catch (error) {
-        failed = true;
-
-        console.error("Installation failed:", error);
-
-        console.groupEnd();
-
-        w96.ui.DialogCreator.alert(
-            `
-            <b>Installation failed!</b>
-            <br><br>
-            ${String(error.message || error)}
-            <br><br>
-            Successfully installed:
-            ${done}/${downloadList.length}
-            <br><br>
-            Check the console for details.
-            `,
-            {
-                title: "CollabVM Setup",
-                icon: "error"
-            }
-        );
     }
-}
 
-main();
+    const setup = new CollabVMSetup();
+    await setup.main([]);
+
+})();
